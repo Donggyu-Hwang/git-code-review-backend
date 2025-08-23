@@ -11,7 +11,47 @@ class ReviewController {
       console.log(`Starting review generation for: ${githubUrl}`);
 
       // 1. GitHub URL 파싱
-      const { owner, repo } = githubService.parseGitHubUrl(githubUrl);
+      let owner, repo;
+      try {
+        const parsed = githubService.parseGitHubUrl(githubUrl);
+        owner = parsed.owner;
+        repo = parsed.repo;
+      } catch (parseError) {
+        // 유효하지 않은 저장소인 경우 간단한 레코드만 저장
+        const reviewRecord = {
+          github_url: githubUrl,
+          repository_owner: null,
+          repository_name: null,
+          team_name: teamName || null,
+          repository_language: null,
+          repository_description: null,
+          analysis_depth: analysisDepth,
+          include_tests: includeTests,
+          include_documentation: includeDocumentation,
+          full_report: '유효한 저장소가 아닙니다',
+          summary: '유효한 저장소가 아닙니다',
+          repository_stats: null,
+          created_at: new Date().toISOString()
+        };
+
+        const savedReview = await databaseService.saveCodeReview(reviewRecord);
+
+        return res.status(201).json({
+          success: true,
+          message: 'Review saved (invalid repository)',
+          review: {
+            id: savedReview.id,
+            githubUrl: savedReview.github_url,
+            repositoryName: 'Invalid Repository',
+            teamName: savedReview.team_name,
+            summary: savedReview.summary,
+            fullReport: savedReview.full_report,
+            createdAt: savedReview.created_at,
+            analysisDepth: savedReview.analysis_depth,
+            repositoryStats: null
+          }
+        });
+      }
       
       // 2. 기존 리뷰 확인 (선택사항)
       const existingReview = await databaseService.getReviewByGitHubUrl(githubUrl);
@@ -29,16 +69,54 @@ class ReviewController {
 
       // 3. GitHub 저장소 분석
       console.log('Analyzing GitHub repository...');
-      const repositoryAnalysis = await githubService.analyzeRepository(owner, repo);
-      
-      // 4. 코드 샘플 가져오기
-      console.log('Fetching code samples...');
-      const codeSamples = await githubService.getCodeSamples(
-        owner, 
-        repo, 
-        repositoryAnalysis.codeFiles,
-        10 // 최대 10개 파일
-      );
+      let repositoryAnalysis, codeSamples;
+      try {
+        repositoryAnalysis = await githubService.analyzeRepository(owner, repo);
+        
+        // 4. 코드 샘플 가져오기
+        console.log('Fetching code samples...');
+        codeSamples = await githubService.getCodeSamples(
+          owner, 
+          repo, 
+          repositoryAnalysis.codeFiles,
+          10 // 최대 10개 파일
+        );
+      } catch (analysisError) {
+        // GitHub API 호출 실패 시 간단한 레코드만 저장
+        const reviewRecord = {
+          github_url: githubUrl,
+          repository_owner: owner,
+          repository_name: repo,
+          team_name: teamName || null,
+          repository_language: null,
+          repository_description: null,
+          analysis_depth: analysisDepth,
+          include_tests: includeTests,
+          include_documentation: includeDocumentation,
+          full_report: '유효한 저장소가 아닙니다',
+          summary: '유효한 저장소가 아닙니다',
+          repository_stats: null,
+          created_at: new Date().toISOString()
+        };
+
+        const savedReview = await databaseService.saveCodeReview(reviewRecord);
+
+        return res.status(201).json({
+          success: true,
+          message: 'Review saved (repository analysis failed)',
+          review: {
+            id: savedReview.id,
+            githubUrl: savedReview.github_url,
+            repositoryName: `${owner}/${repo}`,
+            teamName: savedReview.team_name,
+            summary: savedReview.summary,
+            fullReport: savedReview.full_report,
+            createdAt: savedReview.created_at,
+            analysisDepth: savedReview.analysis_depth,
+            repositoryStats: null
+          }
+        });
+      }
 
       // 5. Bedrock으로 리뷰 보고서 생성
       console.log('Generating review report with Amazon Bedrock...');
@@ -125,7 +203,42 @@ class ReviewController {
           console.log(`Processing repository: ${githubUrl}`);
 
           // 1. GitHub URL 파싱
-          const { owner, repo: repoName } = githubService.parseGitHubUrl(githubUrl);
+          let owner, repoName;
+          try {
+            const parsed = githubService.parseGitHubUrl(githubUrl);
+            owner = parsed.owner;
+            repoName = parsed.repo;
+          } catch (parseError) {
+            // 유효하지 않은 저장소인 경우 간단한 레코드만 저장
+            const reviewRecord = {
+              github_url: githubUrl,
+              repository_owner: null,
+              repository_name: null,
+              team_name: teamName || null,
+              repository_language: null,
+              repository_description: null,
+              analysis_depth: analysisDepth,
+              include_tests: includeTests,
+              include_documentation: includeDocumentation,
+              full_report: '유효한 저장소가 아닙니다',
+              summary: '유효한 저장소가 아닙니다',
+              repository_stats: null,
+              created_at: new Date().toISOString()
+            };
+
+            const savedReview = await databaseService.saveCodeReview(reviewRecord);
+
+            results.push({
+              githubUrl,
+              success: true,
+              reviewId: savedReview.id,
+              note: 'Invalid repository - simple record saved'
+            });
+
+            successful++;
+            console.log(`Saved simple record for invalid repository: ${githubUrl}`);
+            continue;
+          }
           
           // 2. 기존 리뷰 확인
           const existingReview = await databaseService.getReviewByGitHubUrl(githubUrl);
@@ -140,15 +253,48 @@ class ReviewController {
           }
 
           // 3. GitHub 저장소 분석
-          const repositoryAnalysis = await githubService.analyzeRepository(owner, repoName);
-          
-          // 4. 코드 샘플 가져오기
-          const codeSamples = await githubService.getCodeSamples(
-            owner, 
-            repoName, 
-            repositoryAnalysis.codeFiles,
-            10
-          );
+          let repositoryAnalysis, codeSamples;
+          try {
+            repositoryAnalysis = await githubService.analyzeRepository(owner, repoName);
+            
+            // 4. 코드 샘플 가져오기
+            codeSamples = await githubService.getCodeSamples(
+              owner, 
+              repoName, 
+              repositoryAnalysis.codeFiles,
+              10
+            );
+          } catch (analysisError) {
+            // GitHub API 호출 실패 시에도 간단한 레코드 저장
+            const reviewRecord = {
+              github_url: githubUrl,
+              repository_owner: owner,
+              repository_name: repoName,
+              team_name: teamName || null,
+              repository_language: null,
+              repository_description: null,
+              analysis_depth: analysisDepth,
+              include_tests: includeTests,
+              include_documentation: includeDocumentation,
+              full_report: '유효한 저장소가 아닙니다',
+              summary: '유효한 저장소가 아닙니다',
+              repository_stats: null,
+              created_at: new Date().toISOString()
+            };
+
+            const savedReview = await databaseService.saveCodeReview(reviewRecord);
+
+            results.push({
+              githubUrl,
+              success: true,
+              reviewId: savedReview.id,
+              note: 'Repository analysis failed - simple record saved'
+            });
+
+            successful++;
+            console.log(`Saved simple record for failed analysis: ${githubUrl} - ${analysisError.message}`);
+            continue;
+          }
 
           // 5. Bedrock으로 리뷰 보고서 생성
           const repositoryData = {

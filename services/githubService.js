@@ -14,16 +14,41 @@ class GitHubService {
     }
   }
 
-  // GitHub URL에서 owner와 repo 추출
+  // GitHub/GitLab URL에서 owner와 repo 추출
   parseGitHubUrl(url) {
-    const match = url.match(/github\.com\/([^\/]+)\/([^\/]+)/);
-    if (!match) {
-      throw new Error('Invalid GitHub URL format');
+    console.log('Parsing URL:', url);
+    
+    // GitHub, GitLab, Bitbucket URL 처리
+    let match;
+    
+    // 일반적인 저장소 URL: https://github.com/owner/repo
+    match = url.match(/(?:github\.com|gitlab\.com|bitbucket\.org)\/([^\/]+)\/([^\/\?#]+)/);
+    if (match) {
+      const owner = match[1];
+      let repo = match[2].replace(/\.git$/, '');
+      
+      // 조직 페이지나 사용자 페이지인 경우 처리
+      if (repo === 'repositories' || repo === 'repos') {
+        throw new Error('Cannot analyze organization or user page. Please provide a specific repository URL.');
+      }
+      
+      console.log('Parsed owner:', owner, 'repo:', repo);
+      return { owner, repo };
     }
-    return {
-      owner: match[1],
-      repo: match[2].replace(/\.git$/, '')
-    };
+    
+    // 조직 URL 패턴: https://github.com/orgs/orgname/repositories
+    match = url.match(/github\.com\/orgs\/([^\/]+)/);
+    if (match) {
+      throw new Error('Organization page detected. Please provide a specific repository URL like: https://github.com/owner/repository-name');
+    }
+    
+    // 사용자 프로필 URL: https://github.com/username (저장소 없음)
+    match = url.match(/(?:github\.com|gitlab\.com|bitbucket\.org)\/([^\/\?#]+)\/?$/);
+    if (match) {
+      throw new Error('User profile page detected. Please provide a specific repository URL like: https://github.com/username/repository-name');
+    }
+    
+    throw new Error('Invalid repository URL format. Please provide a direct link to a repository.');
   }
 
   // 저장소 정보 가져오기

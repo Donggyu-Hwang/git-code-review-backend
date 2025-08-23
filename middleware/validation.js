@@ -3,23 +3,18 @@ const Joi = require('joi');
 const validateGitHubUrl = (req, res, next) => {
   const schema = Joi.object({
     githubUrl: Joi.string()
-      .uri()
-      .pattern(/^https:\/\/github\.com\/[^\/]+\/[^\/]+\/?$/)
       .required()
       .messages({
-        'string.pattern.base': 'Invalid GitHub repository URL format. Expected: https://github.com/owner/repo',
-        'string.uri': 'Must be a valid URL',
-        'any.required': 'GitHub URL is required'
+        'any.required': 'Repository URL is required',
+        'string.empty': 'Repository URL cannot be empty'
       }),
     teamName: Joi.string()
-      .min(1)
       .max(100)
       .trim()
       .optional()
+      .allow('', null)
       .messages({
-        'string.min': 'Team name must be at least 1 character long',
-        'string.max': 'Team name must be less than 100 characters',
-        'string.empty': 'Team name cannot be empty'
+        'string.max': 'Team name must be less than 100 characters'
       }),
     analysisDepth: Joi.string()
       .valid('basic', 'detailed', 'comprehensive')
@@ -31,9 +26,12 @@ const validateGitHubUrl = (req, res, next) => {
   const { error, value } = schema.validate(req.body);
   
   if (error) {
+    console.error('Single review validation error:', error.details);
     return res.status(400).json({
       error: 'Validation failed',
-      details: error.details[0].message
+      details: error.details[0].message,
+      field: error.details[0].path?.join('.'),
+      receivedValue: error.details[0].context?.value
     });
   }
 
@@ -42,25 +40,22 @@ const validateGitHubUrl = (req, res, next) => {
 };
 
 const validateBulkReviewRequest = (req, res, next) => {
+  console.log('Validating bulk review request:', JSON.stringify(req.body, null, 2));
+  
   const repoSchema = Joi.object({
     githubUrl: Joi.string()
-      .uri()
-      .pattern(/^https:\/\/github\.com\/[^\/]+\/[^\/]+\/?$/)
       .required()
       .messages({
-        'string.pattern.base': 'Invalid GitHub repository URL format. Expected: https://github.com/owner/repo',
-        'string.uri': 'Must be a valid URL',
-        'any.required': 'GitHub URL is required'
+        'any.required': 'Repository URL is required',
+        'string.empty': 'Repository URL cannot be empty'
       }),
     teamName: Joi.string()
-      .min(1)
       .max(100)
       .trim()
       .optional()
+      .allow('', null)
       .messages({
-        'string.min': 'Team name must be at least 1 character long',
-        'string.max': 'Team name must be less than 100 characters',
-        'string.empty': 'Team name cannot be empty'
+        'string.max': 'Team name must be less than 100 characters'
       })
   });
 
@@ -85,9 +80,12 @@ const validateBulkReviewRequest = (req, res, next) => {
   const { error, value } = schema.validate(req.body);
   
   if (error) {
+    console.error('Validation error:', error.details);
     return res.status(400).json({
       error: 'Validation failed',
-      details: error.details[0].message
+      details: error.details[0].message,
+      field: error.details[0].path?.join('.'),
+      receivedValue: error.details[0].context?.value
     });
   }
 
@@ -95,12 +93,14 @@ const validateBulkReviewRequest = (req, res, next) => {
   const urls = value.repos.map(repo => repo.githubUrl.toLowerCase());
   const uniqueUrls = new Set(urls);
   if (urls.length !== uniqueUrls.size) {
+    console.error('Duplicate URLs found:', urls);
     return res.status(400).json({
       error: 'Validation failed',
       details: 'Duplicate repository URLs are not allowed'
     });
   }
 
+  console.log('Validation successful, processed data:', JSON.stringify(value, null, 2));
   req.body = value;
   next();
 };
