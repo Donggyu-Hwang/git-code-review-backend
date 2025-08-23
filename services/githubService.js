@@ -29,7 +29,7 @@ class GitHubService {
       
       // 조직 페이지나 사용자 페이지인 경우 처리
       if (repo === 'repositories' || repo === 'repos') {
-        throw new Error('Cannot analyze organization or user page. Please provide a specific repository URL.');
+        throw new Error('ORGANIZATION_PAGE');
       }
       
       console.log('Parsed owner:', owner, 'repo:', repo);
@@ -39,16 +39,101 @@ class GitHubService {
     // 조직 URL 패턴: https://github.com/orgs/orgname/repositories
     match = url.match(/github\.com\/orgs\/([^\/]+)/);
     if (match) {
-      throw new Error('Organization page detected. Please provide a specific repository URL like: https://github.com/owner/repository-name');
+      throw new Error('ORGANIZATION_PAGE');
     }
     
     // 사용자 프로필 URL: https://github.com/username (저장소 없음)
     match = url.match(/(?:github\.com|gitlab\.com|bitbucket\.org)\/([^\/\?#]+)\/?$/);
     if (match) {
-      throw new Error('User profile page detected. Please provide a specific repository URL like: https://github.com/username/repository-name');
+      throw new Error('USER_PROFILE_PAGE');
     }
     
     throw new Error('Invalid repository URL format. Please provide a direct link to a repository.');
+  }
+
+  // 조직의 모든 저장소 가져오기
+  async getOrganizationRepositories(orgName, maxRepos = 20) {
+    try {
+      console.log(`Fetching repositories for organization: ${orgName}`);
+      const response = await axios.get(`${this.baseURL}/orgs/${orgName}/repos`, {
+        headers: this.headers,
+        params: {
+          type: 'public',
+          sort: 'updated',
+          per_page: maxRepos
+        }
+      });
+
+      return response.data.map(repo => ({
+        name: repo.name,
+        full_name: repo.full_name,
+        html_url: repo.html_url,
+        description: repo.description,
+        language: repo.language,
+        stargazers_count: repo.stargazers_count,
+        updated_at: repo.updated_at
+      }));
+    } catch (error) {
+      if (error.response?.status === 404) {
+        throw new Error('Organization not found or has no public repositories');
+      }
+      if (error.response?.status === 403) {
+        throw new Error('GitHub API rate limit exceeded or access forbidden');
+      }
+      throw new Error(`Failed to fetch organization repositories: ${error.message}`);
+    }
+  }
+
+  // 사용자의 모든 저장소 가져오기
+  async getUserRepositories(username, maxRepos = 20) {
+    try {
+      console.log(`Fetching repositories for user: ${username}`);
+      const response = await axios.get(`${this.baseURL}/users/${username}/repos`, {
+        headers: this.headers,
+        params: {
+          type: 'public',
+          sort: 'updated',
+          per_page: maxRepos
+        }
+      });
+
+      return response.data.map(repo => ({
+        name: repo.name,
+        full_name: repo.full_name,
+        html_url: repo.html_url,
+        description: repo.description,
+        language: repo.language,
+        stargazers_count: repo.stargazers_count,
+        updated_at: repo.updated_at
+      }));
+    } catch (error) {
+      if (error.response?.status === 404) {
+        throw new Error('User not found or has no public repositories');
+      }
+      if (error.response?.status === 403) {
+        throw new Error('GitHub API rate limit exceeded or access forbidden');
+      }
+      throw new Error(`Failed to fetch user repositories: ${error.message}`);
+    }
+  }
+
+  // URL에서 조직/사용자 정보 추출
+  extractOwnerFromUrl(url) {
+    let match;
+    
+    // 조직 URL: https://github.com/orgs/orgname
+    match = url.match(/github\.com\/orgs\/([^\/\?#]+)/);
+    if (match) {
+      return { type: 'organization', name: match[1] };
+    }
+    
+    // 일반 사용자/조직 URL: https://github.com/username
+    match = url.match(/github\.com\/([^\/\?#]+)\/?$/);
+    if (match) {
+      return { type: 'user', name: match[1] };
+    }
+    
+    return null;
   }
 
   // 저장소 정보 가져오기
