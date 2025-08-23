@@ -28,7 +28,7 @@ GitHub 저장소를 분석하여 해커톤 심사위원(기술직군이 아닌 �
         accept: 'application/json',
         body: JSON.stringify({
           anthropic_version: 'bedrock-2023-05-31',
-          max_tokens: 4000,
+          max_tokens: 8192,
           temperature: 0.3,
           messages: [
             {
