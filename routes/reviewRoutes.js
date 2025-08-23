@@ -1,11 +1,17 @@
 const express = require('express');
 const reviewController = require('../controllers/reviewController');
-const { validateGitHubUrl } = require('../middleware/validation');
+const { validateGitHubUrl, validateBulkReviewRequest } = require('../middleware/validation');
 
 const router = express.Router();
 
 // POST /api/reviews/generate - 새 코드 리뷰 생성
 router.post('/generate', validateGitHubUrl, reviewController.generateReview);
+
+// POST /api/reviews/bulk - 대량 코드 리뷰 생성
+router.post('/bulk', validateBulkReviewRequest, reviewController.generateBulkReviews);
+
+// GET /api/reviews/bulk/sample-csv - 샘플 CSV 다운로드
+router.get('/bulk/sample-csv', reviewController.downloadSampleCsv);
 
 // GET /api/reviews - 모든 리뷰 목록 조회
 router.get('/', reviewController.getAllReviews);

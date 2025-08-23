@@ -21,7 +21,14 @@ app.get('/', (req, res) => {
     message: 'Git Code Review Backend API',
     version: '1.0.0',
     endpoints: {
-      'POST /api/reviews/generate': 'Generate code review report from GitHub repository'
+      'POST /api/reviews/generate': 'Generate code review report from GitHub repository',
+      'POST /api/reviews/bulk': 'Generate multiple code review reports (bulk upload)',
+      'GET /api/reviews/bulk/sample-csv': 'Download sample CSV for bulk upload',
+      'GET /api/reviews': 'Get all code reviews',
+      'GET /api/reviews/:id': 'Get specific code review',
+      'GET /api/reviews/stats': 'Get statistics',
+      'GET /api/reviews/team/:teamName': 'Get reviews by team name',
+      'DELETE /api/reviews/:id': 'Delete code review'
     }
   });
 });

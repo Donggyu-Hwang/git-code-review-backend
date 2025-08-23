@@ -106,6 +106,152 @@ class ReviewController {
     }
   }
 
+  // 대량 코드 리뷰 보고서 생성
+  async generateBulkReviews(req, res, next) {
+    try {
+      const { repos, analysisDepth, includeTests, includeDocumentation } = req.body;
+      
+      console.log(`Starting bulk review generation for ${repos.length} repositories`);
+
+      const results = [];
+      let successful = 0;
+      let failed = 0;
+
+      // 각 저장소를 순차적으로 처리 (병렬 처리하면 API 제한에 걸릴 수 있음)
+      for (const repo of repos) {
+        const { githubUrl, teamName } = repo;
+        
+        try {
+          console.log(`Processing repository: ${githubUrl}`);
+
+          // 1. GitHub URL 파싱
+          const { owner, repo: repoName } = githubService.parseGitHubUrl(githubUrl);
+          
+          // 2. 기존 리뷰 확인
+          const existingReview = await databaseService.getReviewByGitHubUrl(githubUrl);
+          if (existingReview) {
+            results.push({
+              githubUrl,
+              success: false,
+              error: 'Review already exists for this repository'
+            });
+            failed++;
+            continue;
+          }
+
+          // 3. GitHub 저장소 분석
+          const repositoryAnalysis = await githubService.analyzeRepository(owner, repoName);
+          
+          // 4. 코드 샘플 가져오기
+          const codeSamples = await githubService.getCodeSamples(
+            owner, 
+            repoName, 
+            repositoryAnalysis.codeFiles,
+            10
+          );
+
+          // 5. Bedrock으로 리뷰 보고서 생성
+          const repositoryData = {
+            ...repositoryAnalysis,
+            codeSamples
+          };
+          
+          const fullReport = await bedrockService.generateCodeReviewReport(
+            repositoryData, 
+            analysisDepth
+          );
+
+          // 6. 요약 생성
+          const summary = await bedrockService.generateSummary(fullReport);
+
+          // 7. 데이터베이스에 저장
+          const reviewRecord = {
+            github_url: githubUrl,
+            repository_owner: owner,
+            repository_name: repoName,
+            team_name: teamName || null,
+            repository_language: repositoryAnalysis.repository.language,
+            repository_description: repositoryAnalysis.repository.description,
+            analysis_depth: analysisDepth,
+            include_tests: includeTests,
+            include_documentation: includeDocumentation,
+            full_report: fullReport,
+            summary: summary,
+            repository_stats: {
+              stars: repositoryAnalysis.repository.stargazers_count,
+              forks: repositoryAnalysis.repository.forks_count,
+              size: repositoryAnalysis.repository.size,
+              files: repositoryAnalysis.structure.totalFiles,
+              languages: repositoryAnalysis.languages
+            },
+            created_at: new Date().toISOString()
+          };
+
+          const savedReview = await databaseService.saveCodeReview(reviewRecord);
+
+          results.push({
+            githubUrl,
+            success: true,
+            reviewId: savedReview.id
+          });
+
+          successful++;
+          console.log(`Successfully processed: ${githubUrl}`);
+
+        } catch (error) {
+          console.error(`Error processing ${githubUrl}:`, error.message);
+          
+          results.push({
+            githubUrl,
+            success: false,
+            error: error.message || 'Unknown error occurred'
+          });
+          
+          failed++;
+        }
+
+        // API 제한을 피하기 위한 짧은 딜레이
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      console.log(`Bulk review generation completed. Success: ${successful}, Failed: ${failed}`);
+
+      res.status(201).json({
+        success: true,
+        message: `Bulk review generation completed. ${successful} successful, ${failed} failed.`,
+        results,
+        summary: {
+          total: repos.length,
+          successful,
+          failed
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in bulk review generation:', error);
+      next(error);
+    }
+  }
+
+  // 샘플 CSV 다운로드
+  async downloadSampleCsv(req, res, next) {
+    try {
+      const sampleData = `githubUrl,teamName
+https://github.com/facebook/react,Frontend Team
+https://github.com/microsoft/vscode,Editor Team
+https://github.com/nodejs/node,Backend Team
+https://github.com/vuejs/vue,Frontend Team
+https://github.com/angular/angular,Frontend Team`;
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="bulk-review-sample.csv"');
+      res.send(sampleData);
+
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // 특정 리뷰 조회
   async getReview(req, res, next) {
     try {

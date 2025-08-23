@@ -3,6 +3,15 @@ const axios = require('axios');
 class GitHubService {
   constructor() {
     this.baseURL = 'https://api.github.com';
+    this.headers = {
+      'Accept': 'application/vnd.github.v3+json',
+      'User-Agent': 'Code-Review-Backend'
+    };
+    
+    // GitHub 토큰이 있으면 인증 헤더 추가
+    if (process.env.GITHUB_TOKEN) {
+      this.headers['Authorization'] = `token ${process.env.GITHUB_TOKEN}`;
+    }
   }
 
   // GitHub URL에서 owner와 repo 추출
@@ -20,7 +29,9 @@ class GitHubService {
   // 저장소 정보 가져오기
   async getRepositoryInfo(owner, repo) {
     try {
-      const response = await axios.get(`${this.baseURL}/repos/${owner}/${repo}`);
+      const response = await axios.get(`${this.baseURL}/repos/${owner}/${repo}`, {
+        headers: this.headers
+      });
       return {
         name: response.data.name,
         description: response.data.description,
@@ -36,6 +47,9 @@ class GitHubService {
       if (error.response?.status === 404) {
         throw new Error('Repository not found or is private');
       }
+      if (error.response?.status === 403) {
+        throw new Error('GitHub API rate limit exceeded or access forbidden');
+      }
       throw new Error(`Failed to fetch repository info: ${error.message}`);
     }
   }
@@ -44,10 +58,14 @@ class GitHubService {
   async getRepositoryTree(owner, repo, sha = 'HEAD') {
     try {
       const response = await axios.get(
-        `${this.baseURL}/repos/${owner}/${repo}/git/trees/${sha}?recursive=1`
+        `${this.baseURL}/repos/${owner}/${repo}/git/trees/${sha}?recursive=1`,
+        { headers: this.headers }
       );
       return response.data.tree;
     } catch (error) {
+      if (error.response?.status === 403) {
+        throw new Error('GitHub API rate limit exceeded or access forbidden');
+      }
       throw new Error(`Failed to fetch repository tree: ${error.message}`);
     }
   }
@@ -56,7 +74,8 @@ class GitHubService {
   async getFileContent(owner, repo, path) {
     try {
       const response = await axios.get(
-        `${this.baseURL}/repos/${owner}/${repo}/contents/${path}`
+        `${this.baseURL}/repos/${owner}/${repo}/contents/${path}`,
+        { headers: this.headers }
       );
       
       if (response.data.type !== 'file') {
@@ -71,6 +90,9 @@ class GitHubService {
         path: response.data.path
       };
     } catch (error) {
+      if (error.response?.status === 403) {
+        throw new Error('GitHub API rate limit exceeded or access forbidden');
+      }
       throw new Error(`Failed to fetch file content: ${error.message}`);
     }
   }

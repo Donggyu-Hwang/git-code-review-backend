@@ -13,6 +13,8 @@
 - 💾 Supabase 데이터베이스를 통한 리뷰 데이터 저장
 - 🔍 실제 구현 vs LLM 생성 코드 판별
 - 📈 통계 및 분석 데이터 제공
+- 🚀 대량 업로드 기능 (CSV 지원)
+- 📋 샘플 CSV 템플릿 제공
 
 ## 기술 스택
 
@@ -39,6 +41,62 @@ POST /api/reviews/generate
   "includeTests": true,
   "includeDocumentation": true
 }
+```
+
+### 대량 코드 리뷰 생성
+```
+POST /api/reviews/bulk
+```
+
+**Request Body:**
+```json
+{
+  "repos": [
+    {
+      "githubUrl": "https://github.com/facebook/react",
+      "teamName": "Frontend Team"
+    },
+    {
+      "githubUrl": "https://github.com/nodejs/node",
+      "teamName": "Backend Team"
+    }
+  ],
+  "analysisDepth": "detailed",
+  "includeTests": true,
+  "includeDocumentation": true
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Bulk review generation completed. 2 successful, 0 failed.",
+  "results": [
+    {
+      "githubUrl": "https://github.com/facebook/react",
+      "success": true,
+      "reviewId": "123e4567-e89b-12d3-a456-426614174000"
+    }
+  ],
+  "summary": {
+    "total": 2,
+    "successful": 2,
+    "failed": 0
+  }
+}
+```
+
+### 샘플 CSV 다운로드
+```
+GET /api/reviews/bulk/sample-csv
+```
+
+CSV 형식 예시:
+```csv
+githubUrl,teamName
+https://github.com/facebook/react,Frontend Team
+https://github.com/microsoft/vscode,Editor Team
 ```
 
 ### 리뷰 조회
@@ -73,6 +131,9 @@ npm install
 SUPABASE_URL=your_supabase_url
 SUPABASE_ANON_KEY=your_supabase_anon_key
 
+# GitHub Configuration  
+GITHUB_TOKEN=your_github_personal_access_token
+
 # AWS Bedrock Configuration
 AWS_BEDROCK_REGION=us-west-2
 AWS_BEDROCK_ACCESS_KEY=your_aws_access_key
@@ -83,6 +144,12 @@ AWS_BEDROCK_PROFILE_ARN=your_bedrock_profile_arn
 PORT=3000
 NODE_ENV=development
 ```
+
+**GitHub 토큰 설정:**
+1. GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+2. "Generate new token" 클릭
+3. repo 권한 선택
+4. 생성된 토큰을 `GITHUB_TOKEN`에 설정
 
 ### 3. 데이터베이스 설정
 
