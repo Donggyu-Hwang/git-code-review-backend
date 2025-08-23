@@ -10,19 +10,19 @@ router.post('/generate', validateGitHubUrl, reviewController.generateReview);
 // POST /api/reviews/bulk - 대량 코드 리뷰 생성
 router.post('/bulk', validateBulkReviewRequest, reviewController.generateBulkReviews);
 
-// GET /api/reviews/bulk/sample-csv - 샘플 CSV 다운로드
+// GET /api/reviews/bulk/sample-csv - 샘플 CSV 다운로드 (구체적인 경로를 먼저 정의)
 router.get('/bulk/sample-csv', reviewController.downloadSampleCsv);
 
-// GET /api/reviews - 모든 리뷰 목록 조회
-router.get('/', reviewController.getAllReviews);
-
-// GET /api/reviews/stats - 통계 조회
+// GET /api/reviews/stats - 통계 조회 (구체적인 경로를 먼저 정의)
 router.get('/stats', reviewController.getStatistics);
 
 // GET /api/reviews/team/:teamName - 팀명으로 리뷰 검색
 router.get('/team/:teamName', reviewController.getReviewsByTeam);
 
-// GET /api/reviews/:id - 특정 리뷰 조회
+// GET /api/reviews - 모든 리뷰 목록 조회
+router.get('/', reviewController.getAllReviews);
+
+// GET /api/reviews/:id - 특정 리뷰 조회 (동적 경로는 마지막에)
 router.get('/:id', reviewController.getReview);
 
 // DELETE /api/reviews/:id - 리뷰 삭제
