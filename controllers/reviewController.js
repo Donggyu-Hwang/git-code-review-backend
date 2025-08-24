@@ -25,8 +25,16 @@ class ReviewController {
               let repositories;
               if (ownerInfo.type === 'organization') {
                 repositories = await githubService.getOrganizationRepositories(ownerInfo.name, 10);
-              } else {
+              } else if (ownerInfo.type === 'user') {
                 repositories = await githubService.getUserRepositories(ownerInfo.name, 10);
+              } else if (ownerInfo.type === 'user_or_org') {
+                // 조직인지 사용자인지 확인
+                const isOrg = await githubService.checkIfOrganization(ownerInfo.name);
+                if (isOrg) {
+                  repositories = await githubService.getOrganizationRepositories(ownerInfo.name, 10);
+                } else {
+                  repositories = await githubService.getUserRepositories(ownerInfo.name, 10);
+                }
               }
 
               if (repositories.length === 0) {
@@ -325,8 +333,16 @@ class ReviewController {
                     let repositories;
                     if (ownerInfo.type === 'organization') {
                       repositories = await githubService.getOrganizationRepositories(ownerInfo.name, 20);
-                    } else {
+                    } else if (ownerInfo.type === 'user') {
                       repositories = await githubService.getUserRepositories(ownerInfo.name, 20);
+                    } else if (ownerInfo.type === 'user_or_org') {
+                      // 조직인지 사용자인지 확인
+                      const isOrg = await githubService.checkIfOrganization(ownerInfo.name);
+                      if (isOrg) {
+                        repositories = await githubService.getOrganizationRepositories(ownerInfo.name, 20);
+                      } else {
+                        repositories = await githubService.getUserRepositories(ownerInfo.name, 20);
+                      }
                     }
 
                     if (repositories.length === 0) {

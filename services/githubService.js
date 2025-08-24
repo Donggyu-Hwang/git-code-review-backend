@@ -121,19 +121,41 @@ class GitHubService {
   extractOwnerFromUrl(url) {
     let match;
     
-    // 조직 URL: https://github.com/orgs/orgname
+    // 조직 URL 패턴들
+    // 1. https://github.com/orgs/orgname
+    // 2. https://github.com/orgs/orgname/repositories
     match = url.match(/github\.com\/orgs\/([^\/\?#]+)/);
     if (match) {
       return { type: 'organization', name: match[1] };
     }
     
-    // 일반 사용자/조직 URL: https://github.com/username
+    // 3. https://github.com/orgname/repositories (조직이 repositories 페이지를 가진 경우)
+    match = url.match(/github\.com\/([^\/\?#]+)\/repositories\/?$/);
+    if (match) {
+      return { type: 'organization', name: match[1] };
+    }
+    
+    // 4. 일반 사용자/조직 URL: https://github.com/username
     match = url.match(/github\.com\/([^\/\?#]+)\/?$/);
     if (match) {
-      return { type: 'user', name: match[1] };
+      // 먼저 조직인지 확인해보고, 실패하면 사용자로 처리
+      return { type: 'user_or_org', name: match[1] };
     }
     
     return null;
+  }
+
+  // 조직인지 사용자인지 확인하는 헬퍼 함수
+  async checkIfOrganization(name) {
+    try {
+      // 조직 정보 확인 시도
+      await axios.get(`${this.baseURL}/orgs/${name}`, {
+        headers: this.headers
+      });
+      return true; // 조직임
+    } catch (error) {
+      return false; // 조직이 아님 (사용자일 가능성)
+    }
   }
 
   // 저장소 정보 가져오기
