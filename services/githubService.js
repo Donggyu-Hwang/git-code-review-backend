@@ -5,12 +5,13 @@ class GitHubService {
     this.baseURL = 'https://api.github.com';
     this.headers = {
       'Accept': 'application/vnd.github.v3+json',
-      'User-Agent': 'Code-Review-Backend'
+      'User-Agent': 'Code-Review-Backend/Donggyu-Hwang'
     };
     
     // GitHub 토큰이 있으면 인증 헤더 추가
     if (process.env.GITHUB_TOKEN) {
       this.headers['Authorization'] = `token ${process.env.GITHUB_TOKEN}`;
+      this.headers['X-GitHub-User'] = 'Donggyu Hwang';
     }
   }
 
